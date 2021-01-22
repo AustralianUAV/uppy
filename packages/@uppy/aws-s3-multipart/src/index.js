@@ -24,6 +24,7 @@ module.exports = class AwsS3Multipart extends Plugin {
     this.id = this.opts.id || 'AwsS3Multipart'
     this.title = 'AWS S3 Multipart'
     this.client = new RequestClient(uppy, opts)
+    this.uploadStartEventsData = [];
 
     const defaultOptions = {
       timeout: 30 * 1000,
@@ -34,17 +35,17 @@ module.exports = class AwsS3Multipart extends Plugin {
       prepareUploadPart: this.prepareUploadPart.bind(this),
       abortMultipartUpload: this.abortMultipartUpload.bind(this),
       completeMultipartUpload: this.completeMultipartUpload.bind(this)
-    }
+    };
 
-    this.opts = { ...defaultOptions, ...opts }
+    this.opts = { ...defaultOptions, ...opts };
 
-    this.upload = this.upload.bind(this)
+    this.upload = this.upload.bind(this);
 
-    this.requests = new RateLimitedQueue(this.opts.limit)
+    this.requests = new RateLimitedQueue(this.opts.limit, false);
 
-    this.uploaders = Object.create(null)
-    this.uploaderEvents = Object.create(null)
-    this.uploaderSockets = Object.create(null)
+    this.uploaders = Object.create(null);
+    this.uploaderEvents = Object.create(null);
+    this.uploaderSockets = Object.create(null);
   }
 
   /**
@@ -261,7 +262,7 @@ module.exports = class AwsS3Multipart extends Plugin {
       })
 
       if (!file.isRestored) {
-        this.uppy.emit('upload-started', file, upload)
+        this.uploadStartEventsData.push({file, upload});
       }
     })
   }
@@ -401,18 +402,51 @@ module.exports = class AwsS3Multipart extends Plugin {
     })
   }
 
-  upload (fileIDs) {
-    if (fileIDs.length === 0) return Promise.resolve()
-
-    const promises = fileIDs.map((id) => {
-      const file = this.uppy.getFile(id)
-      if (file.isRemote) {
-        return this.uploadRemote(file)
+  divideIntoChunks = (arr, chunkSize = null) => {
+    const minSize = 300;
+    chunkSize = chunkSize ? chunkSize : arr.length / 100;
+    chunkSize = chunkSize < minSize ? minSize : chunkSize;
+    const chunks = [];
+    for (const id of arr) {
+      const lastChunk = chunks.length > 0 ? chunks[chunks.length - 1] : null;
+      if (lastChunk && lastChunk.length < chunkSize) {
+        lastChunk.push(id)
+      } else {
+        chunks.push([id]);
       }
-      return this.uploadFile(file)
-    })
+    }
 
-    return Promise.all(promises)
+    return chunks;
+  }
+
+  async upload (fileIDs) {2
+    if (fileIDs.length === 0) return;
+
+    this.uppy.emit('upload-started', null);
+    const chunks = this.divideIntoChunks(fileIDs);
+    const promises = [];
+    for (const chunk of chunks) {
+      const chunkPromises = chunk.map((id) => {
+      var file = this.uppy.getFile(id);
+        if (file.isRemote) {
+          return this.uploadRemote(file);
+        }
+        return this.uploadFile(file);
+      });
+      promises.push(...chunkPromises);
+      await new Promise((resolve) => {setTimeout(() => resolve(), 200)});
+    }
+
+    const eventChunks = this.divideIntoChunks(this.uploadStartEventsData);
+    // Before starting upload send events of all files starting so loading can be generated
+    for (eventChunk of eventChunks) {
+      this.uppy.emit('upload-started', eventChunk);
+      await new Promise((resolve) => {setTimeout(() => resolve(), 400)});
+    }
+
+    this.requests.start();
+    this.uppy.emit('start-event-completed');
+    return Promise.all(promises);
   }
 
   onFileRemove (fileID, cb) {

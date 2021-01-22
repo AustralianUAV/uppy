@@ -13,12 +13,14 @@ function createCancelError () {
 }
 
 module.exports = class RateLimitedQueue {
-  constructor (limit) {
+  constructor (limit, start = true) {
     if (typeof limit !== 'number' || limit === 0) {
       this.limit = Infinity
     } else {
       this.limit = limit
     }
+
+    this.startNow = start;
 
     this.activeRequests = 0
     this.queuedHandlers = []
@@ -65,6 +67,9 @@ module.exports = class RateLimitedQueue {
   }
 
   _next () {
+    if (!this.startNow) {
+      return;
+    }
     if (this.activeRequests >= this.limit) {
       return
     }
@@ -112,10 +117,17 @@ module.exports = class RateLimitedQueue {
   }
 
   run (fn, queueOptions) {
-    if (this.activeRequests < this.limit) {
+    if (this.startNow && this.activeRequests < this.limit) {
       return this._call(fn)
     }
     return this._queue(fn, queueOptions)
+  }
+
+  start () {
+    this.startNow = true;
+    for (let i = 0; i < this.limit; i++) {
+      this._next();
+    }
   }
 
   wrapPromiseFunction (fn, queueOptions) {

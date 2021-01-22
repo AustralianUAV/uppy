@@ -201,7 +201,9 @@ class Uppy {
         isHidden: true,
         type: 'info',
         message: ''
-      }
+      },
+      uploadInitilizationComplete: false,
+      uploadProcessingStarted: false
     })
 
     this._storeUnsubscribe = this.store.subscribe((prevState, nextState, patch) => {
@@ -956,6 +958,9 @@ class Uppy {
   }
 
   _calculateProgress (file, data) {
+    if (!this.getState().uploadInitilizationComplete) {
+      return;
+    }
     if (!this.getFile(file.id)) {
       this.log(`Not setting progress for a file that has been removed: ${file.id}`)
       return
@@ -980,6 +985,9 @@ class Uppy {
   }
 
   _calculateTotalProgress () {
+    if (!this.getState().uploadInitilizationComplete) {
+      return;
+    }
     // calculate total progress, using the number of files currently uploading,
     // multiplied by 100 and the summ of individual progress of each file
     const files = this.getFiles()
@@ -1093,21 +1101,35 @@ class Uppy {
       this.setState({ error: null })
     })
 
-    this.on('upload-started', (file, upload) => {
-      if (!this.getFile(file.id)) {
-        this.log(`Not setting progress for a file that has been removed: ${file.id}`)
-        return
+    this.on('upload-started', (filesData) => {
+      if (!filesData) {
+        this.setState({ uploadProcessingStarted: true });
+        return;
       }
-      this.setFileState(file.id, {
-        progress: {
-          uploadStarted: Date.now(),
-          uploadComplete: false,
-          percentage: 0,
-          bytesUploaded: 0,
-          bytesTotal: file.size
+      for (const fileData of filesData) {
+        const file = fileData['file'];
+        const upload = fileData['upload'];
+
+        if (!this.getFile(file.id)) {
+          this.log("Not setting progress for a file that has been removed: " + file.id);
+          return;
         }
-      })
-    })
+
+        this.setFileState(file.id, {
+          progress: {
+            uploadStarted: Date.now(),
+            uploadComplete: false,
+            percentage: 0,
+            bytesUploaded: 0,
+            bytesTotal: file.size
+          }
+        });
+      }
+    });
+
+    this.on('start-event-completed', () => {
+      this.setState({uploadInitilizationComplete: true})
+    });
 
     this.on('upload-progress', this._calculateProgress)
 

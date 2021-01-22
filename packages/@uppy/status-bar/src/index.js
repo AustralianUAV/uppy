@@ -31,6 +31,7 @@ module.exports = class StatusBar extends Plugin {
         pause: 'Pause',
         resume: 'Resume',
         done: 'Done',
+        processing: 'Processing...',
         filesUploadedOfTotal: {
           0: '%{complete} of %{smart_count} file uploaded',
           1: '%{complete} of %{smart_count} files uploaded'
@@ -110,13 +111,17 @@ module.exports = class StatusBar extends Plugin {
     })
   }
 
-  getUploadingState (isAllErrored, isAllComplete, files) {
+  getUploadingState (uploadProcessingStarted, uploadInitilizationComplete, isAllErrored, isAllComplete, files) {
     if (isAllErrored) {
       return statusBarStates.STATE_ERROR
     }
 
     if (isAllComplete) {
       return statusBarStates.STATE_COMPLETE
+    }
+
+    if (uploadProcessingStarted && !uploadInitilizationComplete) {
+      return statusBarStates.STATE_PREPARING_UPLOAD;
     }
 
     let state = statusBarStates.STATE_WAITING
@@ -147,7 +152,9 @@ module.exports = class StatusBar extends Plugin {
       files,
       allowNewUpload,
       totalProgress,
-      error
+      error,
+      uploadInitilizationComplete,
+      uploadProcessingStarted
     } = state
 
     // TODO: move this to Core, to share between Status Bar and Dashboard
@@ -190,7 +197,7 @@ module.exports = class StatusBar extends Plugin {
       totalUploadedSize = totalUploadedSize + (file.progress.bytesUploaded || 0)
     })
 
-    const isUploadStarted = startedFiles.length > 0
+    const isUploadStarted = startedFiles.length > 0;
 
     const isAllComplete = totalProgress === 100 &&
       completeFiles.length === Object.keys(files).length &&
@@ -203,11 +210,11 @@ module.exports = class StatusBar extends Plugin {
 
     const isUploadInProgress = inProgressFiles.length > 0
     const resumableUploads = capabilities.resumableUploads || false
-    const supportsUploadProgress = capabilities.uploadProgress !== false
+    const supportsUploadProgress = capabilities.uploadProgress !== false && uploadInitilizationComplete
 
     return StatusBarUI({
       error,
-      uploadState: this.getUploadingState(isAllErrored, isAllComplete, state.files || {}),
+      uploadState: this.getUploadingState(uploadProcessingStarted, uploadInitilizationComplete, isAllErrored, isAllComplete, state.files || {}),
       allowNewUpload,
       totalProgress,
       totalSize,
@@ -216,9 +223,11 @@ module.exports = class StatusBar extends Plugin {
       isAllPaused,
       isAllErrored,
       isUploadStarted,
+      uploadProcessingStarted,
+      uploadInitilizationComplete,
       isUploadInProgress,
       complete: completeFiles.length,
-      newFiles: newFiles.length,
+      newFiles: (isUploadStarted || uploadProcessingStarted) && !uploadInitilizationComplete ? 0 : newFiles.length,
       numUploads: startedFiles.length,
       totalETA,
       files,

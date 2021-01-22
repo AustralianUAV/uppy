@@ -81,7 +81,7 @@ module.exports = (props) => {
     progressBarContent = ProgressBarProcessing(progress)
   } else if (uploadState === statusBarStates.STATE_COMPLETE) {
     progressBarContent = ProgressBarComplete(props)
-  } else if (uploadState === statusBarStates.STATE_UPLOADING) {
+  } else if (uploadState === statusBarStates.STATE_UPLOADING || uploadState === statusBarStates.STATE_PREPARING_UPLOAD) {
     if (!props.supportsUploadProgress) {
       progressMode = 'indeterminate'
       progressValue = null
@@ -159,7 +159,7 @@ const UploadBtn = (props) => {
       onclick={props.startUpload}
       data-uppy-super-focusable
     >
-      {props.newFiles && props.isUploadStarted
+      {props.newFiles && (props.isUploadStarted)
         ? props.i18n('uploadXNewFiles', { smart_count: props.newFiles })
         : props.i18n('uploadXFiles', { smart_count: props.newFiles })}
     </button>
@@ -346,11 +346,11 @@ const UploadNewlyAddedFiles = (props) => {
 const ThrottledProgressDetails = throttle(ProgressDetails, 500, { leading: true, trailing: true })
 
 const ProgressBarUploading = (props) => {
-  if (!props.isUploadStarted || props.isAllComplete) {
+  if (!(props.isUploadStarted || props.uploadProcessingStarted) || props.isAllComplete) {
     return null
   }
 
-  const title = props.isAllPaused ? props.i18n('paused') : props.i18n('uploading')
+  const title = props.isAllPaused ? props.i18n('paused') : (props.uploadInitilizationComplete ? props.i18n('uploading') : props.i18n('processing'))
   const showUploadNewlyAddedFiles = props.newFiles && props.isUploadStarted
 
   return (
