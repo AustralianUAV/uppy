@@ -23,7 +23,7 @@
     "@uppy/aws-s3-multipart": "file:packages/@uppy/aws-s3-multipart",
     "@uppy/core": "file:packages/@uppy/core",
     "@uppy/dashboard": "file:packages/@uppy/dashboard",
-    "@uppy/react": "file:packages/@uppy/react",
+    "@uppy/react": "file:packages/@uppy/react"
   },
   "devDependencies": {
     "@babel/cli": "7.10.5",
