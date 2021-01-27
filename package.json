@@ -17,7 +17,6 @@
       "path": "packages/uppy/index.js"
     }
   ],
-  "pre-commit": "lint:staged",
   "license": "MIT",
   "dependencies": {
     "@uppy/aws-s3-multipart": "file:packages/@uppy/aws-s3-multipart",

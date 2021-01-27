@@ -5,6 +5,7 @@ const emitSocketProgress = require('@uppy/utils/lib/emitSocketProgress')
 const getSocketHost = require('@uppy/utils/lib/getSocketHost')
 const RateLimitedQueue = require('@uppy/utils/lib/RateLimitedQueue')
 const Uploader = require('./MultipartUploader')
+const regeneratorRuntime = require("regenerator-runtime/runtime");
 
 function assertServerError (res) {
   if (res && res.error) {
@@ -419,7 +420,7 @@ module.exports = class AwsS3Multipart extends Plugin {
     return chunks;
   }
 
-  async upload (fileIDs) {2
+  async upload (fileIDs) {
     if (fileIDs.length === 0) return;
 
     this.uppy.emit('upload-started', null);
